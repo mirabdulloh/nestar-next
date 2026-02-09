@@ -1,5 +1,5 @@
 import React, { ChangeEvent, useEffect, useState } from 'react';
-import { Box, Button, Checkbox, Stack, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
 import useDeviceDetect from '../../libs/hooks/useDeviceDetect';
 import withLayoutFull from '../../libs/components/layout/LayoutFull';
 import { NextPage } from 'next';
@@ -68,15 +68,16 @@ const PropertyDetail: NextPage = ({ initialComment, ...props }: any) => {
 		error: getPropertyError,
 		refetch: getPropertyRefetch,
 	} = useQuery(GET_PROPERTY, {
-		fetchPolicy: 'cache-and-network',
+		fetchPolicy: 'network-only',
 		variables: { input: propertyId },
 		skip: !propertyId,
 		notifyOnNetworkStatusChange: true,
 		onCompleted: (data: T) => {
 			if (data?.getProperty) {
 				setProperty(data?.getProperty);
-			} else if (data?.getProperty) {
-				setSlideImage(data?.getProperty?.propertyImages[0]);
+				if (data?.getProperty?.propertyImages?.length) {
+					setSlideImage(data?.getProperty?.propertyImages[0]);
+				}
 			}
 		},
 	});
@@ -195,6 +196,11 @@ const PropertyDetail: NextPage = ({ initialComment, ...props }: any) => {
 		setCommentInquiry({ ...commentInquiry });
 	};
 
+	if( getPropertyLoading){
+		return(<Stack sx={{display: 'flex', justifyContent: 'center', alignItems: 'center',width: '100%', height: '1080px'}}>
+			<CircularProgress size={"4rem"} />
+		</Stack>)
+	}
 	if (device === 'mobile') {
 		return <div>PROPERTY DETAIL PAGE</div>;
 	} else {
