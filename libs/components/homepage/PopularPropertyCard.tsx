@@ -132,7 +132,7 @@ const PopularPropertyCard = (props: PopularPropertyCardProps) => {
 					<Divider sx={{ mt: '15px', mb: '17px' }} />
 					<div className={'bott'}>
 						<p>{property?.propertyRent ? 'rent' : 'sale'}</p>
-	s					<div className="view-like-box">
+						<div className="view-like-box">
 							<IconButton color={'default'}>
 								<RemoveRedEyeIcon />
 							</IconButton>
