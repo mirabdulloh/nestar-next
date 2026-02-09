@@ -20,7 +20,10 @@ const PopularPropertyCard = (props: PopularPropertyCardProps) => {
 	const user = useReactiveVar(userVar);
 
 	/** HANDLERS **/
-
+	const pushDetailHandler = async (id: string) => {
+		console.log('PRopertyId =>', id);
+		router.push(`/property/detail?id=${id}`);
+	};
 	if (device === 'mobile') {
 		return (
 			<Stack className="popular-card-box">
@@ -28,6 +31,9 @@ const PopularPropertyCard = (props: PopularPropertyCardProps) => {
 					component={'div'}
 					className={'card-img'}
 					style={{ backgroundImage: `url(${REACT_APP_API_URL}/${property?.propertyImages[0]})` }}
+					onClick={() => {
+						pushDetailHandler(property?._id);
+					}}
 				>
 					{property && property?.propertyRank >= topPropertyRank ? (
 						<div className={'status'}>
@@ -41,7 +47,14 @@ const PopularPropertyCard = (props: PopularPropertyCardProps) => {
 					<div className={'price'}>${property.propertyPrice}</div>
 				</Box>
 				<Box component={'div'} className={'info'}>
-					<strong className={'title'}>{property.propertyTitle}</strong>
+					<strong
+						className={'title'}
+						onClick={() => {
+							pushDetailHandler(property?._id);
+						}}
+					>
+						{property.propertyTitle}
+					</strong>
 					<p className={'desc'}>{property.propertyAddress}</p>
 					<div className={'options'}>
 						<div>
@@ -77,6 +90,9 @@ const PopularPropertyCard = (props: PopularPropertyCardProps) => {
 					component={'div'}
 					className={'card-img'}
 					style={{ backgroundImage: `url(${REACT_APP_API_URL}/${property?.propertyImages[0]})` }}
+					onClick={() => {
+						pushDetailHandler(property?._id);
+					}}
 				>
 					{property && property?.propertyRank >= topPropertyRank ? (
 						<div className={'status'}>
@@ -90,7 +106,14 @@ const PopularPropertyCard = (props: PopularPropertyCardProps) => {
 					<div className={'price'}>${property.propertyPrice}</div>
 				</Box>
 				<Box component={'div'} className={'info'}>
-					<strong className={'title'}>{property.propertyTitle}</strong>
+					<strong
+						className={'title'}
+						onClick={() => {
+							pushDetailHandler(property?._id);
+						}}
+					>
+						{property.propertyTitle}
+					</strong>
 					<p className={'desc'}>{property.propertyAddress}</p>
 					<div className={'options'}>
 						<div>
@@ -109,7 +132,7 @@ const PopularPropertyCard = (props: PopularPropertyCardProps) => {
 					<Divider sx={{ mt: '15px', mb: '17px' }} />
 					<div className={'bott'}>
 						<p>{property?.propertyRent ? 'rent' : 'sale'}</p>
-						<div className="view-like-box">
+	s					<div className="view-like-box">
 							<IconButton color={'default'}>
 								<RemoveRedEyeIcon />
 							</IconButton>
