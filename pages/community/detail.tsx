@@ -5,7 +5,7 @@ import useDeviceDetect from '../../libs/hooks/useDeviceDetect';
 import withLayoutBasic from '../../libs/components/layout/LayoutBasic';
 import { Button, Stack, Typography, Tab, Tabs, IconButton, Backdrop, Pagination } from '@mui/material';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
-import { useReactiveVar } from '@apollo/client';
+import { useMutation, useQuery, useReactiveVar } from '@apollo/client';
 import Moment from 'react-moment';
 import { userVar } from '../../apollo/store';
 import ThumbUpOffAltIcon from '@mui/icons-material/ThumbUpOffAlt';
@@ -16,11 +16,22 @@ import ChatBubbleOutlineRoundedIcon from '@mui/icons-material/ChatBubbleOutlineR
 import { CommentsInquiry } from '../../libs/types/comment/comment.input';
 import { Comment } from '../../libs/types/comment/comment';
 import dynamic from 'next/dynamic';
-import { CommentStatus } from '../../libs/enums/comment.enum';
+import { CommentGroup, CommentStatus } from '../../libs/enums/comment.enum';
 import { T } from '../../libs/types/common';
 import EditIcon from '@mui/icons-material/Edit';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import { BoardArticle } from '../../libs/types/board-article/board-article';
+import { CREATE_COMMENT, LIKE_TARGET_BOARD_ARTICLE, UPDATE_COMMENT } from '../../apollo/user/mutation';
+import { GET_BOARD_ARTICLE, GET_BOARD_ARTICLES, GET_COMMENTS } from '../../apollo/user/query';
+import {
+	sweetConfirmAlert,
+	sweetErrorHandling,
+	sweetMixinErrorAlert,
+	sweetMixinSuccessAlert,
+	sweetTopSmallSuccessAlert,
+} from '../../libs/sweetAlert';
+import { Message } from '../../libs/enums/common.enum';
+import { get } from 'http';
 const ToastViewerComponent = dynamic(() => import('../../libs/components/community/TViewer'), { ssr: false });
 
 export const getStaticProps = async ({ locale }: any) => ({
@@ -57,6 +68,42 @@ const CommunityDetail: NextPage = ({ initialInput, ...props }: T) => {
 	const [boardArticle, setBoardArticle] = useState<BoardArticle>();
 
 	/** APOLLO REQUESTS **/
+	const [likeTargetArticle] = useMutation(LIKE_TARGET_BOARD_ARTICLE);
+	const [createComment] = useMutation(CREATE_COMMENT);
+	const [updateComment] = useMutation(UPDATE_COMMENT);
+
+	const {
+		loading: boardArticleLoading,
+		data: boardArticleData,
+		error: boardArticleError,
+		refetch: boardArticleRefetch,
+	} = useQuery(GET_BOARD_ARTICLE, {
+		fetchPolicy: 'network-only',
+		variables: { input: articleId },
+		notifyOnNetworkStatusChange: true,
+		onCompleted: (data: T) => {
+			setBoardArticle(data?.getBoardArticle);
+			if (data?.getBoardArticle?.memberData?.memberImage) {
+				setMemberImage(`${process.env.REACT_APP_API_URL}/${data?.getBoardArticle?.memberData?.memberImage}`);
+			}
+		},
+	});
+
+	const {
+		loading: getCommentsLoading,
+		data: getCommentsData,
+		error: getCommentsError,
+		refetch: getCommentsRefetch,
+	} = useQuery(GET_COMMENTS, {
+		fetchPolicy: 'network-only',
+		variables: { input: searchFilter },
+		skip: !searchFilter?.search?.commentRefId,
+		notifyOnNetworkStatusChange: true,
+		onCompleted: (data: T) => {
+			if (data?.getComments?.list) setComments(data?.getComments?.list);
+			if (data?.getComments?.metaCounter[0]?.total) setTotal(data?.getComments?.metaCounter[0]?.total ?? 0);
+		},
+	});
 
 	/** LIFECYCLES **/
 	useEffect(() => {
@@ -74,10 +121,6 @@ const CommunityDetail: NextPage = ({ initialInput, ...props }: T) => {
 			{ shallow: true },
 		);
 	};
-
-	const creteCommentHandler = async () => {};
-
-	const updateButtonHandler = async (commentId: string, commentStatus?: CommentStatus.DELETE) => {};
 
 	const getCommentMemberImage = (imageUrl: string | undefined) => {
 		if (imageUrl) return `${process.env.REACT_APP_API_URL}/${imageUrl}`;
@@ -103,6 +146,84 @@ const CommunityDetail: NextPage = ({ initialInput, ...props }: T) => {
 
 	const paginationHandler = (e: T, value: number) => {
 		setSearchFilter({ ...searchFilter, page: value });
+	};
+
+	const likeArticleHandler = async (user: T, id: any) => {
+		try {
+			//! execute likeTargetProperty Mutation
+			//! execute getProperties Refetch
+			if (likeLoading) return;
+			if (!id) return;
+			if (!user._id) throw new Error(Message.NOT_AUTHENTICATED);
+
+			setLikeLoading(true);
+
+			await likeTargetArticle({ variables: { input: id } });
+
+			boardArticleRefetch({ input: id });
+			await sweetTopSmallSuccessAlert('success', 800);
+		} catch (err: any) {
+			console.log('Err on likePropertyHandler:', err);
+			sweetMixinErrorAlert(err.message).then();
+		} finally {
+			setLikeLoading(false);
+		}
+	};
+
+	const creteCommentHandler = async () => {
+		try {
+			if (!user._id) throw new Error(Message.NOT_AUTHENTICATED);
+			const commentInput = {
+				commentGroup: CommentGroup.ARTICLE,
+				commentRefId: articleId,
+				commentContent: comment,
+			};
+			await createComment({ variables: { input: commentInput } });
+
+			await getCommentsRefetch({ input: searchFilter });
+			await boardArticleRefetch({ input: articleId });
+
+			setComment('');
+			await sweetMixinSuccessAlert('successfully commented!', 800);
+		} catch (err) {
+			await sweetErrorHandling(err).then();
+		}
+	};
+
+	const updateButtonHandler = async (commentId: string, commentStatus?: CommentStatus) => {
+		try {
+			if (!user._id) throw new Error(Message.NOT_AUTHENTICATED);
+
+			if (!commentId) throw new Error('Select comment to update!');
+			if (updatedComment === comments?.find((comment) => comment?._id === commentId)?.commentContent) return;
+			const commentUpdateInput = {
+				_id: commentId,
+				...(commentStatus && { commentStatus: commentStatus }),
+				...(updatedComment && { commentContent: updatedComment }),
+			};
+
+			if (!commentUpdateInput.commentContent && !commentUpdateInput.commentStatus)
+				throw new Error('provide data to update comment');
+			if (commentStatus) {
+				if (await sweetConfirmAlert('Do you want to delete this comment?')) {
+					await updateComment({ variables: { input: commentUpdateInput } });
+					await sweetMixinSuccessAlert('successfully deleted!', 800);
+				} else return;
+			} else {
+				await updateComment({ variables: { input: commentUpdateInput } });
+				await sweetMixinSuccessAlert('successfully updated!', 800);
+			}
+
+			await getCommentsRefetch({ input: searchFilter });
+			await boardArticleRefetch({ input: articleId });
+		} catch (err) {
+			await sweetErrorHandling(err).then();
+		} finally {
+			setOpenBackdrop(false);
+			setUpdatedComment('');
+			setUpdatedCommentWordsCnt(0);
+			setUpdatedCommentId('');
+		}
 	};
 
 	if (device === 'mobile') {
@@ -195,7 +316,11 @@ const CommunityDetail: NextPage = ({ initialInput, ...props }: T) => {
 										</Stack>
 										<Stack className="info">
 											<Stack className="icon-info">
-												{boardArticle?.meLiked ? <ThumbUpAltIcon /> : <ThumbUpOffAltIcon />}
+												{boardArticle?.meLiked ? (
+													<ThumbUpAltIcon onClick={() => likeArticleHandler(user, boardArticle?._id)} />
+												) : (
+													<ThumbUpOffAltIcon onClick={() => likeArticleHandler(user, boardArticle?._id)} />
+												)}
 
 												<Typography className="text">{boardArticle?.articleLikes}</Typography>
 											</Stack>
@@ -285,7 +410,7 @@ const CommunityDetail: NextPage = ({ initialInput, ...props }: T) => {
 																<DeleteForeverIcon sx={{ color: '#757575', cursor: 'pointer' }} />
 															</IconButton>
 															<IconButton
-																onClick={(e) => {
+																onClick={(e: any) => {
 																	setUpdatedComment(commentData?.commentContent);
 																	setUpdatedCommentWordsCnt(commentData?.commentContent?.length);
 																	setUpdatedCommentId(commentData?._id);
