@@ -2,7 +2,6 @@ import { PropertyLocation, PropertyStatus, PropertyType } from '../../enums/prop
 import { Direction } from '../../enums/common.enum';
 
 export interface PropertyInput {
-	_id: string;
 	propertyType: PropertyType;
 	propertyLocation: PropertyLocation;
 	propertyAddress: string;
