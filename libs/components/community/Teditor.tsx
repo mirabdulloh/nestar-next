@@ -8,6 +8,10 @@ import { useRouter } from 'next/router';
 import axios from 'axios';
 import { T } from '../../types/common';
 import '@toast-ui/editor/dist/toastui-editor.css';
+import { useMutation } from '@apollo/client';
+import { CREATE_BOARD_ARTICLE } from '../../../apollo/user/mutation';
+import { sweetErrorHandling, sweetTopSuccessAlert } from '../../sweetAlert';
+import { Category } from '@mui/icons-material';
 
 const TuiEditor = () => {
 	const editorRef = useRef<Editor>(null),
@@ -16,6 +20,8 @@ const TuiEditor = () => {
 	const [articleCategory, setArticleCategory] = useState<BoardArticleCategory>(BoardArticleCategory.FREE);
 
 	/** APOLLO REQUESTS **/
+
+	const [createArticle] = useMutation(CREATE_BOARD_ARTICLE);
 
 	const memoizedValues = useMemo(() => {
 		const articleTitle = '',
@@ -76,7 +82,36 @@ const TuiEditor = () => {
 		memoizedValues.articleTitle = e.target.value;
 	};
 
-	const handleRegisterButton = async () => {};
+	const handleRegisterButton = async () => {
+		try {
+			const editor = editorRef.current;
+			const articleContent = editor?.getInstance().getHTML() as string;
+			memoizedValues.articleContent = articleContent;
+
+			if (memoizedValues.articleContent === '' && memoizedValues.articleTitle === '') {
+				throw new Error('All fields are required');
+			}
+
+			await createArticle({
+				variables: {
+					input: {
+						...memoizedValues,
+						articleCategory,
+					},
+				},
+			});
+
+			await sweetTopSuccessAlert('Successfully created!', 700).then();
+			await router.push({
+				pathname: '/mypage',
+				query: {
+					category: 'myArticles',
+				},
+			});
+		} catch (err: any) {
+			await sweetErrorHandling(err).then();
+		}
+	};
 
 	const doDisabledCheck = () => {
 		if (memoizedValues.articleContent === '' || memoizedValues.articleTitle === '') {
