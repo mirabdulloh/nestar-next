@@ -38,7 +38,7 @@ const AdminProperties: NextPage = ({ initialInquiry, ...props }: any) => {
 		loading: getAllPropertiesByAdminLoading,
 		data: getAllPropertiesByAdminData,
 		error: getAllPropertiesByAdminError,
-		refetch: ggetAllPropertiesByAdminRefetch,
+		refetch: getAllPropertiesByAdminRefetch,
 	} = useQuery(GET_ALL_PROPERTIES_BY_ADMIN, {
 		fetchPolicy: 'network-only',
 		variables: { input: propertiesInquiry },
@@ -100,7 +100,7 @@ const AdminProperties: NextPage = ({ initialInquiry, ...props }: any) => {
 		try {
 			if (await sweetConfirmAlert('Are you sure to remove?')) {
 				await removePropertyByAdmin({ variables: { input: id } });
-				ggetAllPropertiesByAdminRefetch({ input: propertiesInquiry });
+				getAllPropertiesByAdminRefetch({ input: propertiesInquiry });
 				await sweetConfirmAlert('Removed!');
 			}
 			menuIconCloseHandler();
@@ -136,7 +136,7 @@ const AdminProperties: NextPage = ({ initialInquiry, ...props }: any) => {
 		try {
 			console.log('+updateData: ', updateData);
 			await updatePropertyByAdmin({ variables: { input: updateData } });	
-			await ggetAllPropertiesByAdminRefetch({ input: propertiesInquiry });
+			await getAllPropertiesByAdminRefetch({ input: propertiesInquiry });
 			menuIconCloseHandler();
 		} catch (err: any) {
 			menuIconCloseHandler();
