@@ -27,6 +27,8 @@ const AdminCommunity: NextPage = ({ initialInquiry, ...props }: any) => {
 
 	/** APOLLO REQUESTS **/
 
+	
+
 	/** LIFECYCLES **/
 	useEffect(() => {}, [communityInquiry]);
 
