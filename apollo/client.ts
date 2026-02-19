@@ -7,7 +7,7 @@ import { onError } from '@apollo/client/link/error';
 import { getJwtToken } from '../libs/auth';
 import { TokenRefreshLink } from 'apollo-link-token-refresh';
 import { sweetErrorAlert } from '../libs/sweetAlert';
-import { strict } from 'assert';
+import { socketVar } from './store';
 let apolloClient: ApolloClient<NormalizedCacheObject>;
 
 function getHeaders() {
@@ -28,7 +28,30 @@ const tokenRefreshLink = new TokenRefreshLink({
 		return null;
 	},
 });
+// Custom  WebSocket client
+class LoggingWebSocket {
+	private socket: WebSocket;
 
+	constructor(url: string) {
+		this.socket = new WebSocket(`${url}?token=${getJwtToken()}`);
+		socketVar(this.socket);
+		this.socket.onopen = () => {
+			console.log('WebSocket connection !');
+		};
+		this.socket.onmessage = (msg) => {
+			console.log('WebSocket message:', msg.data);
+		};
+		this.socket.onerror = (error) => {
+			console.log('WebSocket error:', error);
+		};
+	}
+	send(data: string | ArrayBuffer | SharedArrayBuffer | Blob | ArrayBuffer) {
+		this.socket.send(data);
+	}
+	close() {
+		this.socket.close();
+	}
+}
 function createIsomorphicLink() {
 	if (typeof window !== 'undefined') {
 		const authLink = new ApolloLink((operation, forward) => {
@@ -47,35 +70,6 @@ function createIsomorphicLink() {
 			uri: process.env.REACT_APP_API_GRAPHQL_URL,
 		});
 
-		// Custom WebSocket client
-
-		class LogginWebSokcet {
-			private socket: WebSocket;
-			constructor(uri: string) {
-				this.socket = new WebSocket(uri);
-
-				this.socket.onopen = () => {
-					console.log('Websocket open');
-				};
-				this.socket.onmessage = (msg) => {
-					console.log(' Websokcet message', msg.data);
-				};
-				this.socket.onerror = (err) => {
-					console.log('Websocket error', err);
-				};
-				this.socket.onclose = () => {
-					console.log('Websocket closed');
-				}
-			}
-			send(data: string | Blob | ArrayBuffer | SharedArrayBuffer | ArrayBufferView) {
-				this.socket.send(data);
-			}
-
-			close() {
-				this.socket.close();
-			}
-		}
-
 		/* WEBSOCKET SUBSCRIPTION LINK */
 		const wsLink = new WebSocketLink({
 			uri: process.env.REACT_APP_API_WS ?? 'ws://127.0.0.1:3007',
@@ -86,19 +80,16 @@ function createIsomorphicLink() {
 					return { headers: getHeaders() };
 				},
 			},
-			webSocketImpl: LogginWebSokcet,
+			webSocketImpl: LoggingWebSocket,
 		});
 
 		const errorLink = onError(({ graphQLErrors, networkError, response }) => {
 			if (graphQLErrors) {
 				graphQLErrors.map(({ message, locations, path, extensions }) => {
 					console.log(`[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`);
-					if (!message.includes('input')) {
-						sweetErrorAlert(message);
-					}
+					if (!message.includes('input')) sweetErrorAlert(message);
 				});
 			}
-
 			if (networkError) console.log(`[Network error]: ${networkError}`);
 			// @ts-ignore
 			if (networkError?.statusCode === 401) {
